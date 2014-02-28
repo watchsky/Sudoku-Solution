@@ -51,12 +51,12 @@ public class MainPanel extends JPanel implements SearchProcessListener{
     }
 
     @Override
-    public int[][] getPrimaryMapArray() {
+    public int[][] getInitMapArray() {
         return primaryMapArray;
     }
 
     @Override
-    public int[][] getFinalMapArray() {
+    public int[][] getExpectedResultMapArray() {
         return finalMapArray;
     }
 
@@ -79,7 +79,7 @@ public class MainPanel extends JPanel implements SearchProcessListener{
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new DepthFirstSearcher(MainPanel.this).doSearch();
+                new DepthFirstSearcher(MainPanel.this).doSearch(primaryMapArray, finalMapArray).printDirection();
             }
         }).start();
     }
