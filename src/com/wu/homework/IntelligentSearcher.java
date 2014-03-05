@@ -7,56 +7,218 @@ import java.util.LinkedList;
 /**
  * Created by xiangwu on 2/27/14.
  */
-public class IntelligentSearcher {
-    //    上左下右四个方向移动时对x和y坐标的影响
-    private final int dx[] = {0, -1, 0, 1};
-    private final int dy[] = {-1, 0, 1, 0};
-    private final int maxAct = 4;
-    private final int TABLE_NUM = 200000;
-    private final int NUM = 9;
-    private int act /*移动的方向*/, currentNodeIndex /*当前的结点*/;
-    private Node fatherNode;
-    private int x, y;
-    private char[] actX = new char[TABLE_NUM], actY = new char[TABLE_NUM];
-    private char[][] statTable;
-    private char[] nextPoint = new char[NUM];
-    private OpenList openList;
-    private HashMap<String, Node> closedList;
+public class IntelligentSearcher extends Searcher{
+    private int runtimeNodeIndex;
     private int lengthOfSideOfGrids;
-    private SearchProcessListener searchProcessListener;
+    private Node fatherNode;
+    private char[] nodeIndex_X = new char[MAX_NUMBER_OF_STAT_TABLE];
+    private char[] nodeIndex_Y = new char[MAX_NUMBER_OF_STAT_TABLE];
+    private WaitingSearchList waitingSearchList;
+    private HashMap<String, Node> finishedSearchList;
 
-    class OpenList extends ArrayList<Node> {
-        public Node pollMinFNode() {
-            int minF = 100;
-            Node minNode = null;
-            for (Node e : this) {
-                if (e.f < minF) {
-                    minF = e.f;
-                    minNode = e;
+    public IntelligentSearcher(int[][] initialMapArray, int lengthOfSideOfGrids) {
+        this.lengthOfSideOfGrids = lengthOfSideOfGrids;
+        statTable[0] = new char[NUMBER_OF_GRIDS];
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                statTable[0][i*lengthOfSideOfGrids + j] = (char) initialMapArray[i][j];
+                if (initialMapArray[i][j] == 0) {
+                    runtimeIndexOfBlank_X = j;
+                    runtimeIndexOfBlank_Y = i;
+                    nodeIndex_X[0] = (char) runtimeIndexOfBlank_X;
+                    nodeIndex_Y[0] = (char) runtimeIndexOfBlank_Y;
                 }
             }
-            remove(minNode);
-            return minNode;
+        }
+        waitingSearchList = new WaitingSearchList();
+        finishedSearchList = new HashMap<String, Node>();
+    }
+
+    @Override
+    public SearchedPath search(int[][] resultMapArray) {
+        System.out.println("Start searching");
+        doSearch(resultMapArray);
+        if (fatherNode == null) {
+            System.out.println("No Result");
+            return null;
+        }
+        SearchedPath path = getPath();
+        System.out.println("Path length : " + path.getPath().size());
+        waitingSearchList.clear();
+        finishedSearchList.clear();
+        return path;
+    }
+
+    private void doSearch(int[][] resultMapArray) {
+        int direction;
+        runtimeNodeIndex = 0;
+        Node rootNode = new Node(runtimeNodeIndex, (char)-1, null, resultMapArray);
+        waitingSearchList.add(rootNode);
+        while (true) {
+            fatherNode = waitingSearchList.pollNodeWithMinimumEstimatedValue();
+            if (fatherNode == null) {
+                break;
+            }
+            if (doseSearchFindTheResult(resultMapArray, fatherNode.index)) {
+                break;
+            }
+            finishedSearchList.put(String.valueOf(fatherNode.index), fatherNode);
+            for (direction = 0; direction < COUNT_OF_ACTION; direction++) {
+                if (isDirectionValid(direction)) {
+                    runtimeNodeIndex++;
+                    nodeIndex_X[runtimeNodeIndex] = (char) runtimeIndexOfBlank_X;
+                    nodeIndex_Y[runtimeNodeIndex] = (char) runtimeIndexOfBlank_Y;
+                    saveMapStat();
+                    waitingSearchList.add(new Node(runtimeNodeIndex, (char) direction, fatherNode, resultMapArray));
+                }
+            }
         }
     }
 
-    class Node {
-        final int f, g;
-        final int selfIndex;
-        final char act;
-        final Node parent;
+    private boolean doseSearchFindTheResult(int[][] resultMapArray, int index) {
+        int tmp;
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                tmp = i * lengthOfSideOfGrids + j;
+                if (statTable[index][tmp] != resultMapArray[i][j])
+                    return false;
+            }
+        }
+        return true;
+    }
 
-        Node(int selfIndex, char act, Node parent) {
-            this.g = (parent != null) ? parent.g + 1 : 0;
-            this.f = this.g + calculateH(selfIndex);
-            this.selfIndex = selfIndex;
-            this.act = act;
+    private boolean isDirectionValid(int direction) {
+        runtimeIndexOfBlank_X = nodeIndex_X[fatherNode.index] + DX[direction];
+        runtimeIndexOfBlank_Y = nodeIndex_Y[fatherNode.index] + DY[direction];
+        if (isMapIndexOutOfBoundary(runtimeIndexOfBlank_X, runtimeIndexOfBlank_Y))
+            return false;
+        if (isStatAlreadyExistent()) return false;
+        return true;
+    }
+
+    private boolean isMapIndexOutOfBoundary(int indexX, int indexY) {
+        if (indexX >= lengthOfSideOfGrids || indexX < 0)
+            return true;
+        if (indexY >= lengthOfSideOfGrids || indexY < 0)
+            return true;
+        return false;
+    }
+
+    private boolean isStatAlreadyExistent() {
+        char[] nextStepStat = calculateNextStepStat();
+        boolean isExist;
+        for (int i = 0; i <= runtimeNodeIndex; i++) {
+            isExist = true;
+            for (int j = 0; j < NUMBER_OF_GRIDS - 1; j++) {
+                if (statTable[i][j] != nextStepStat[j]) {
+                    isExist = false;
+                    break;
+                }
+            }
+            if (isExist)
+                return true;
+        }
+        return false;
+    }
+
+    private char[] calculateNextStepStat() {
+        char[] nextStepStat = new char[NUMBER_OF_GRIDS];
+        for (int i = 0; i < NUMBER_OF_GRIDS; i++) {
+            nextStepStat[i] = statTable[fatherNode.index][i];
+        }
+        int index = nodeIndex_Y[fatherNode.index] * lengthOfSideOfGrids + nodeIndex_X[fatherNode.index];
+        char m = nextStepStat[index];
+        nextStepStat[index] = nextStepStat[runtimeIndexOfBlank_Y * lengthOfSideOfGrids + runtimeIndexOfBlank_X];
+        nextStepStat[runtimeIndexOfBlank_Y * lengthOfSideOfGrids + runtimeIndexOfBlank_X] = m;
+        return nextStepStat;
+    }
+
+    private void saveMapStat() {
+        char[] nextStepStat = calculateNextStepStat();
+        statTable[runtimeNodeIndex] = new char[NUMBER_OF_GRIDS];
+        for (int i = 0; i < NUMBER_OF_GRIDS; i++) {
+            statTable[runtimeNodeIndex][i] = nextStepStat[i];
+        }
+    }
+
+    private SearchedPath getPath() {
+        SearchedPath path = new SearchedPath();
+        LinkedList<DirectionChar> directionList = new LinkedList<DirectionChar>();
+        int index = fatherNode.index;
+        while (index != 0) {
+            directionList.addLast(new DirectionChar(fatherNode.direction));
+            fatherNode = fatherNode.parent;
+            index = fatherNode.index;
+        }
+        while (!directionList.isEmpty()) {
+            path.addDirection(directionList.removeLast().getDirection());
+        }
+        return path;
+    }
+
+    class WaitingSearchList extends ArrayList<Node> {
+
+        public Node pollNodeWithMinimumEstimatedValue() {
+            int minimumValue = 1000;
+            Node nodeWithMinimumEstimatedValue = null;
+            for (Node node : this) {
+                if (node.estimatedValue < minimumValue) {
+                    minimumValue = node.estimatedValue;
+                    nodeWithMinimumEstimatedValue = node;
+                }
+            }
+            remove(nodeWithMinimumEstimatedValue);
+            return nodeWithMinimumEstimatedValue;
+        }
+    }
+    class Node {
+
+        final int index;
+        final char direction;
+        final Node parent;
+        final int estimatedValue;
+        final int currentValue;
+
+        Node(int index, char direction, Node parent, int[][] resultMapArray) {
+            this.index = index;
+            this.direction = direction;
             this.parent = parent;
+            this.currentValue = (parent != null) ? parent.currentValue + 1 : 0;
+            this.estimatedValue = this.currentValue + calculateCost(index, resultMapArray);
+        }
+
+        private int calculateCost(int index, int[][] resultMapArray) {
+            int cost = 0;
+            int targetX = 0, targetY = 0;
+            boolean findGridWithSameNumber;
+            for (int y = 0; y < lengthOfSideOfGrids; y++) {
+                for (int x = 0; x < lengthOfSideOfGrids; x++) {
+                    int gridNumber = statTable[index][y*lengthOfSideOfGrids + x];
+                    if (gridNumber == 0)
+                        continue;
+                    findGridWithSameNumber = false;
+                    for (int i = 0; i < lengthOfSideOfGrids; i++) {
+                        for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                            if (gridNumber == resultMapArray[i][j]) {
+                                targetX = j;
+                                targetY = i;
+                                findGridWithSameNumber = true;
+                                break;
+                            }
+                        }
+                        if (findGridWithSameNumber)
+                            break;
+                    }
+                    cost += Math.abs(targetX - x);
+                    cost += Math.abs(targetY - y);
+                }
+            }
+            return cost;
         }
 
         @Override
         public int hashCode() {
-            return selfIndex;
+            return index;
         }
 
         @Override
@@ -65,156 +227,7 @@ public class IntelligentSearcher {
                 return false;
             if (obj == this)
                 return true;
-            return this.selfIndex == ((Node)obj).selfIndex;
+            return this.index == ((Node)obj).index;
         }
-    }
-
-    public IntelligentSearcher(SearchProcessListener searchProcessListener) {
-        this.searchProcessListener = searchProcessListener;
-        lengthOfSideOfGrids = searchProcessListener.getLengthOfSideOfGrids();
-        statTable = new char[TABLE_NUM][];
-        statTable[0] = new char[NUM];
-        for (int i = 0; i < lengthOfSideOfGrids; i++) {
-            for (int j = 0; j < lengthOfSideOfGrids; j++) {
-                int tmp = i * lengthOfSideOfGrids + j;
-                statTable[0][tmp] = (char) searchProcessListener.getPrimaryMapArray()[i][j];
-                if (searchProcessListener.getPrimaryMapArray()[i][j] == 0) {
-                    x = j;
-                    y = i;
-                    actX[0] = (char)x;
-                    actY[0] = (char)y;
-                }
-            }
-        }
-        openList = new OpenList();
-        closedList = new HashMap<String, Node>();
-    }
-
-    private int calculateH(int index) {
-        int sum = 0;
-        int targetX = 0, targetY = 0;
-        boolean isFound;
-        for (int i = 0; i < lengthOfSideOfGrids; i++) {
-            for (int j = 0; j < lengthOfSideOfGrids; j++) {
-                int ind = i * lengthOfSideOfGrids + j;
-                int tmp = statTable[index][ind];
-                if (tmp == 0)
-                    continue;
-                isFound = false;
-                for (int k = 0; k < lengthOfSideOfGrids; k++) {
-                    for (int l = 0; l < lengthOfSideOfGrids; l++) {
-                        if (tmp == searchProcessListener.getFinalMapArray()[k][l]) {
-                            targetX = l;
-                            targetY = k;
-                            isFound = true;
-                            break;
-                        }
-                    }
-                    if (isFound)
-                        break;
-                }
-                sum += Math.abs(targetX - j);
-                sum += Math.abs(targetY - i);
-            }
-        }
-        return sum;
-    }
-
-    private boolean isSearchFinished(int index) {
-        int tmp;
-        for (int i = 0; i < lengthOfSideOfGrids; i++) {
-            for (int j = 0; j < lengthOfSideOfGrids; j++) {
-                tmp = i * lengthOfSideOfGrids + j;
-                if (statTable[index][tmp] != searchProcessListener.getFinalMapArray()[i][j])
-                    return false;
-            }
-        }
-        return true;
-    }
-
-    private boolean isActionOK() {
-        x = actX[fatherNode.selfIndex] + dx[act - 1];
-        y = actY[fatherNode.selfIndex] + dy[act - 1];
-        if (x >= lengthOfSideOfGrids || x < 0)
-            return false;
-        if (y >= lengthOfSideOfGrids || y < 0)
-            return false;
-        for (int i = 0; i < NUM; i++) {
-            nextPoint[i] = statTable[fatherNode.selfIndex][i];
-        }
-        int tmp = actY[fatherNode.selfIndex] * lengthOfSideOfGrids + actX[fatherNode.selfIndex];
-        char m = nextPoint[tmp];
-        nextPoint[tmp] = nextPoint[y * lengthOfSideOfGrids + x];
-        nextPoint[y * lengthOfSideOfGrids + x] = m;
-        boolean isExist;
-        for (int i = 0; i <= currentNodeIndex; i++) {
-            isExist = true;
-            for (int j = 0; j < NUM - 1; j++) {
-                if (statTable[i][j] != nextPoint[j]) {
-                    isExist = false;
-                    break;
-                }
-            }
-            if (isExist)
-                return false;
-        }
-        return true;
-    }
-
-    public void doSearch() {
-        System.out.println("Start Searching. And waiting...");
-        currentNodeIndex = 0;
-        Node rootNode = new Node(currentNodeIndex, (char)0, null);
-        openList.add(rootNode);
-        while (true) {
-            fatherNode = openList.pollMinFNode();
-            if (fatherNode == null) {
-                searchProcessListener.setSearchResult(false);
-                break;
-            }
-            if (isSearchFinished(fatherNode.selfIndex)) {
-                break;
-            }
-            closedList.put(String.valueOf(fatherNode.selfIndex), fatherNode);
-            for (act = 1; act <= maxAct; act++) {
-                if (isActionOK()) {
-                    currentNodeIndex++;
-                    actX[currentNodeIndex] = (char)x;
-                    actY[currentNodeIndex] = (char)y;
-                    statTable[currentNodeIndex] = new char[NUM];
-                    for (int i = 0; i < NUM; i++) {
-                        statTable[currentNodeIndex][i] = nextPoint[i];
-                    }
-                    openList.add(new Node(currentNodeIndex, (char)act, fatherNode));
-                }
-            }
-        }
-        LinkedList<CharObject> stackList = new LinkedList<CharObject>();
-        int tmpAct = fatherNode.selfIndex;
-        while (tmpAct != 0) {
-            stackList.addLast(new CharObject(fatherNode.act));
-            fatherNode = fatherNode.parent;
-            tmpAct = fatherNode.selfIndex;
-        }
-        int startX = actX[0], startY = actY[0];
-        int nextX, nextY;
-        int action;
-        System.out.println("step : " + stackList.size());
-        while (!stackList.isEmpty()){
-            action = stackList.removeLast().getCh();
-            nextX = startX + dx[action - 1];
-            nextY = startY + dy[action - 1];
-            searchProcessListener.getPrimaryMap().exchange(startY, startX, nextY, nextX);
-            try {
-                Thread.sleep(500);
-            }catch(InterruptedException e) {
-                e.printStackTrace();
-            }
-            startX = nextX;
-            startY = nextY;
-        }
-        searchProcessListener.onSearchFinished();
-        openList.clear();
-        closedList.clear();
     }
 }

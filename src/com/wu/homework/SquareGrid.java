@@ -11,13 +11,13 @@ import java.awt.*;
  */
 public class SquareGrid {
     private static final int NUMBER_OF_BLANK_SPACE = 0;
-    private int posX, posY;
+    private int leftTopX, leftTopY;
     private int length;
     private int num;
 
-    public SquareGrid(int posX, int posY, int length, int num) {
-        this.posX = posX;
-        this.posY = posY;
+    public SquareGrid(int leftTopX, int leftTopY, int length, int num) {
+        this.leftTopX = leftTopX;
+        this.leftTopY = leftTopY;
         this.length = length;
         this.num = num;
     }
@@ -30,12 +30,12 @@ public class SquareGrid {
 
     private void drawBorder(Graphics2D g) {
         g.setPaint(Color.BLACK);
-        g.drawRect(posX, posY, length, length);
+        g.drawRect(leftTopX, leftTopY, length, length);
     }
 
     private void drawBackground(Graphics2D g) {
         setPaint(g);
-        g.fillRect(posX, posY, length, length);
+        g.fillRect(leftTopX, leftTopY, length, length);
     }
 
     private void setPaint(Graphics2D g) {
@@ -49,23 +49,23 @@ public class SquareGrid {
         if (num == NUMBER_OF_BLANK_SPACE)
             return ;
         g.setPaint(Color.BLACK);
-        g.drawString(String.valueOf(num), posX + length / 2, posY + length / 2);
+        g.drawString(String.valueOf(num), leftTopX + length / 2, leftTopY + length / 2);
     }
 
     public void upWards() {
-        posY -= length;
+        leftTopY -= length;
     }
 
     public void downWards() {
-        posY += length;
+        leftTopY += length;
     }
 
     public void rightWards() {
-        posX += length;
+        leftTopX += length;
     }
 
     public void leftWards() {
-        posX -= length;
+        leftTopX -= length;
     }
 
 }

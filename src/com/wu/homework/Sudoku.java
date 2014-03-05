@@ -5,23 +5,27 @@ import java.awt.*;
 /**
  * Created by xiangwu on 2/27/14.
  */
-public class Sudoku {
+public class Sudoku implements Direction{
     public static final int LENGTH_OF_SIDE_OF_GRIDS = 3;
     private SquareGrid[][] gridMap;
-    private int startPosX, startPosY;
-    private int length;
+    private int startIndexX, startIndexY;
     private SearchProcessListener searchProcessListener;
 
-    public Sudoku(SearchProcessListener searchProcessListener, int startPosX, int startPosY, int length, int mapArray[][]) {
+    public Sudoku(SearchProcessListener searchProcessListener, int leftTopX, int leftTopY, int gridLength, int mapArray[][]) {
         this.searchProcessListener = searchProcessListener;
-        this.startPosX = startPosX;
-        this.startPosY = startPosY;
-        this.length = length;
+        initGridMap(leftTopX, leftTopY, gridLength, mapArray);
+    }
+
+    private void initGridMap(int leftTopX, int leftTopY, int gridLength, int[][] mapArray) {
         gridMap = new SquareGrid[LENGTH_OF_SIDE_OF_GRIDS][];
         for (int i = 0; i < LENGTH_OF_SIDE_OF_GRIDS; i++) {
             gridMap[i] = new SquareGrid[LENGTH_OF_SIDE_OF_GRIDS];
             for (int j = 0; j < LENGTH_OF_SIDE_OF_GRIDS; j++) {
-                gridMap[i][j] = new SquareGrid(startPosX + j * length, startPosY + i * length, length, mapArray[i][j]);
+                gridMap[i][j] = new SquareGrid(leftTopX + j * gridLength, leftTopY + i * gridLength, gridLength, mapArray[i][j]);
+                if (mapArray[i][j] == 0) {
+                    startIndexX = j;
+                    startIndexY = i;
+                }
             }
         }
     }
@@ -71,6 +75,24 @@ public class Sudoku {
         temp = gridMap[posY1][posX1];
         gridMap[posY1][posX1] = gridMap[posY2][posX2];
         gridMap[posY2][posX2] = temp;
-        searchProcessListener.onSearchFinished();
+        searchProcessListener.redraw();
+    }
+
+    public void show(SearchedPath path) {
+        int nextX, nextY;
+        if (path == null || path.getPath() == null)
+            return;
+        for (Integer dir : path.getPath()) {
+            nextX = startIndexX + DX[dir];
+            nextY = startIndexY + DY[dir];
+            exchange(startIndexY, startIndexX, nextY, nextX);
+            try {
+                Thread.sleep(500);
+            }catch(InterruptedException e) {
+                e.printStackTrace();
+            }
+            startIndexX = nextX;
+            startIndexY = nextY;
+        }
     }
 }

@@ -13,8 +13,8 @@ import java.awt.event.ActionListener;
  * To change this template use File | Settings | File Templates.
  */
 public class ButtonPanel extends JPanel {
-    public static final int NUMBER_OF_BUTTONS = 4;
-    private final String NAMES_OF_BUTTONS[] = {"深度搜索", "广度搜索", "启发式搜索", "还原初始状态"};
+    private static final int NUMBER_OF_BUTTONS = 4;
+    private static final String NAMES_OF_BUTTONS[] = {"深度搜索", "广度搜索", "启发式搜索", "还原初始状态"};
     private JButton buttons[];
     private MainPanel mainPanel;
 
@@ -25,6 +25,11 @@ public class ButtonPanel extends JPanel {
     }
 
     private void initializeButtons() {
+        initializeButtonsView();
+        addActionListenerForButtons();
+    }
+
+    private void initializeButtonsView() {
         buttons = new JButton[NUMBER_OF_BUTTONS];
         this.add(new JLabel());  //in order to align the buttons
         this.add(new JLabel());
@@ -36,7 +41,6 @@ public class ButtonPanel extends JPanel {
             this.add(new JLabel());
             this.add(new JLabel());
         }
-        addActionListenerForButtons();
     }
 
     private void addActionListenerForButtons() {

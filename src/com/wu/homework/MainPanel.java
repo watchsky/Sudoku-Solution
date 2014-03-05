@@ -21,7 +21,7 @@ public class MainPanel extends JPanel implements SearchProcessListener{
     private int startPosX = 50, startPosY = 50;
     private int length = 50;
     private int lengthOfSideOfGrids;
-    private boolean doTheSearchHaveResult = true;
+    private boolean doesTheSearchHaveResult = true;
 
     public MainPanel() {
 //  初始状态图
@@ -41,7 +41,7 @@ public class MainPanel extends JPanel implements SearchProcessListener{
         primaryMap.drawMap(g2D);
         g2D.drawString("目标：", 20, 240);
         finalMap.drawMap(g2D);
-        if (doTheSearchHaveResult == false)
+        if (doesTheSearchHaveResult == false)
             g2D.drawString("没有结果", 20, 20);
     }
 
@@ -51,27 +51,12 @@ public class MainPanel extends JPanel implements SearchProcessListener{
     }
 
     @Override
-    public int[][] getInitMapArray() {
-        return primaryMapArray;
-    }
-
-    @Override
     public int[][] getExpectedResultMapArray() {
         return finalMapArray;
     }
 
     @Override
-    public Sudoku getPrimaryMap() {
-        return primaryMap;
-    }
-
-    @Override
-    public void setSearchResult(boolean result) {
-        doTheSearchHaveResult = result;
-    }
-
-    @Override
-    public void onSearchFinished() {
+    public void redraw() {
         repaint();
     }
 
@@ -79,7 +64,7 @@ public class MainPanel extends JPanel implements SearchProcessListener{
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new DepthFirstSearcher(MainPanel.this).doSearch(primaryMapArray, finalMapArray).printDirection();
+                primaryMap.show(new DepthFirstSearcher(new Layout(primaryMapArray, 3)).search(finalMapArray));
             }
         }).start();
     }
@@ -88,7 +73,7 @@ public class MainPanel extends JPanel implements SearchProcessListener{
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new BreadthFirstSearcher(MainPanel.this).doSearch();
+                primaryMap.show(new BreadthFirstSearcher(primaryMapArray, lengthOfSideOfGrids).search(finalMapArray));
             }
         }).start();
     }
@@ -97,13 +82,13 @@ public class MainPanel extends JPanel implements SearchProcessListener{
         new Thread(new Runnable() {
             @Override
             public void run() {
-                new IntelligentSearcher(MainPanel.this).doSearch();
+                primaryMap.show(new IntelligentSearcher(primaryMapArray, lengthOfSideOfGrids).search(finalMapArray));
             }
         }).start();
     }
 
     public void restore() {
-        doTheSearchHaveResult = true;
+        doesTheSearchHaveResult = true;
         primaryMap = new Sudoku(this, startPosX, startPosY, length, primaryMapArray);
         repaint();
     }
@@ -165,10 +150,10 @@ public class MainPanel extends JPanel implements SearchProcessListener{
     class MouseAction implements MouseListener {
         @Override
         public void mousePressed(MouseEvent e) {
-            setMapIndex(e);
+            setGridIndex(e);
         }
 
-        private void setMapIndex(MouseEvent e) {
+        private void setGridIndex(MouseEvent e) {
             pressedPosX = e.getX();
             pressedPosY = e.getY();
             mapIndexX = (pressedPosX - startPosX) / length;

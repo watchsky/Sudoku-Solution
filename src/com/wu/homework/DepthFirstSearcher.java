@@ -3,163 +3,200 @@ package com.wu.homework;
 /**
  * Created by xiangwu on 2/27/14.
  */
-public class DepthFirstSearcher {
-    //    上左下右四个方向移动时对x和y坐标的影响
-    private final int DX[] = {0, -1, 0, 1};
-    private final int DY[] = {-1, 0, 1, 0};
-    private final int maxAct = 4; //移动方向总数
-    private char[] grid_0_0 = new char[200000];
-    private char[] grid_0_1 = new char[200000];
-    private char[] grid_0_2 = new char[200000];
-    private char[] grid_1_0 = new char[200000];
-    private char[] grid_1_2 = new char[200000];
-    private char[] grid_2_0 = new char[200000];
-    private char[] grid_2_1 = new char[200000];
-    private char[] grid_2_2 = new char[200000];
-    private int count = 0;
-    private int level = -1;
-    private boolean levelComplete = false, allComplete = false;
-    private char[] act = new char[110];
-    private int x, y;
-    private int startX, startY;
-    private int[][] runtimeMapArray;    //搜索时用来表示当前的状态
-    private SearchProcessListener searchProcessListener;
+public class DepthFirstSearcher extends Searcher {
+    private char[][] runtimeMapArray;
+    private int searchingDirectionAmount = 0;
+    private int searchingLevel;
+    private int lengthOfSideOfGrids;
+    private boolean isLevelSearchCompleted = false, isSearchCompleted = false;
+    private int[] directions = new int[110];
 
-    public DepthFirstSearcher(SearchProcessListener searchProcessListener) {
-        this.searchProcessListener = searchProcessListener;
-        runtimeMapArray = new int[searchProcessListener.getLengthOfSideOfGrids()][];
-        for (int i = 0; i < searchProcessListener.getLengthOfSideOfGrids(); i++) {
-            runtimeMapArray[i] = new int[searchProcessListener.getLengthOfSideOfGrids()];
-            for (int j = 0; j < searchProcessListener.getLengthOfSideOfGrids(); j++) {
-                runtimeMapArray[i][j] = searchProcessListener.getPrimaryMapArray()[i][j];
-                if (searchProcessListener.getPrimaryMapArray()[i][j] == 0) {
-                    startX = x = j;
-                    startY = y = i;
+    public DepthFirstSearcher(Layout layout) {
+        this.lengthOfSideOfGrids = layout.getLengthOfSideOfGrids();
+        int lengthOfSideOfGrids1 = layout.getLengthOfSideOfGrids();
+        runtimeMapArray = new char[lengthOfSideOfGrids1][];
+        int[][] initialMapArray1 = layout.getValueArray();
+        for (int i = 0; i < lengthOfSideOfGrids1; i++) {
+            runtimeMapArray[i] = new char[lengthOfSideOfGrids1];
+            for (int j = 0; j < lengthOfSideOfGrids1; j++) {
+                runtimeMapArray[i][j] = (char) initialMapArray1[i][j];
+                if (initialMapArray1[i][j] == 0) {
+                    runtimeIndexOfBlank_X = j;
+                    runtimeIndexOfBlank_Y = i;
                 }
             }
         }
     }
 
-    private boolean isSearchFinished() {
-        for (int i = 0; i < searchProcessListener.getLengthOfSideOfGrids(); i++) {
-            for (int j = 0; j < searchProcessListener.getLengthOfSideOfGrids(); j++) {
-                if (searchProcessListener.getFinalMapArray()[i][j] != runtimeMapArray[i][j])
+    @Override
+    public SearchedPath search(int[][] resultMapArray) {
+        System.out.println("Start searching");
+        doSearch(resultMapArray);
+        if (!doseSearchFindTheResult(resultMapArray)) {
+            System.out.println("No Result");
+            return null;
+        }
+        System.out.println("Path length : " + (searchingLevel + 1));
+        return getPath();
+    }
+
+    private void doSearch(int[][] resultMapArray) {
+        searchingLevel = -1;
+        statTable[0] = new char[NUMBER_OF_GRIDS];
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                statTable[0][i*lengthOfSideOfGrids + j] = runtimeMapArray[i][j];
+            }
+        }
+        searchingDirectionAmount++;
+        while (searchIsNotCompleted()) {
+            searchNextLevel(resultMapArray);
+        }
+    }
+
+    private boolean searchIsNotCompleted() {
+        return !isSearchCompleted;
+    }
+
+    private void searchNextLevel(int[][] resultMapArray) {
+        searchingLevel++;
+        isLevelSearchCompleted = false;
+        while (currentLevelSearchIsNotCompleted()) {
+            changeDirectionInCurrentLevel();
+            if (isDirectionValid()) {
+                saveMapStat();
+                if (doseSearchFindTheResult(resultMapArray)) {
+                    isSearchCompleted = true;
+                }
+                isLevelSearchCompleted = true;
+            }
+            else {
+                if (hasSearchedAllDirectionsInCurrentLevel())
+                    goBackToTheLastLevel();
+                if (doNotHaveResult()) {
+                    isLevelSearchCompleted = true;
+                    isSearchCompleted = true;
+                }
+            }
+        }
+    }
+
+    private boolean currentLevelSearchIsNotCompleted() {
+        return !isLevelSearchCompleted;
+    }
+
+    private void changeDirectionInCurrentLevel() {
+        directions[searchingLevel]++;
+    }
+
+    private boolean doseSearchFindTheResult(int[][] resultMapArray) {
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                if ((char)resultMapArray[i][j] != runtimeMapArray[i][j])
                     return false;
             }
         }
         return true;
     }
 
-    private boolean isActionOK() {
-        if (act[level] > maxAct)
+    private boolean isDirectionValid() {
+        if (hasSearchedAllDirectionsInCurrentLevel())
             return false;
-        if (level > 30)
+        if (searchLevelIsTooMuch())
             return false;
-        int nextX = x + DX[act[level] - 1];
-        int nextY = y + DY[act[level] - 1];
-        if (nextX >= searchProcessListener.getLengthOfSideOfGrids() || nextX < 0)
+        int nextX = runtimeIndexOfBlank_X + DX[directions[searchingLevel] - 1];
+        int nextY = runtimeIndexOfBlank_Y + DY[directions[searchingLevel] - 1];
+        if (isMapIndexOutOfBoundary(nextX, nextY))
             return false;
-        if (nextY >= searchProcessListener.getLengthOfSideOfGrids() || nextY < 0)
-            return false;
-        int tmp;
-        tmp = runtimeMapArray[y][x];
-        runtimeMapArray[y][x] = runtimeMapArray[nextY][nextX];
-        runtimeMapArray[nextY][nextX] = tmp;
-        for (int i = 0; i < count; i++) {
-            if ((grid_0_0[i] == (char) runtimeMapArray[0][0]) && (grid_0_1[i] == (char) runtimeMapArray[0][1]) && (grid_0_2[i] == (char) runtimeMapArray[0][2]) &&
-                    (grid_1_0[i] == (char) runtimeMapArray[1][0]) && (grid_1_2[i] == (char) runtimeMapArray[1][2]) &&
-                    (grid_2_0[i] == (char) runtimeMapArray[2][0]) && (grid_2_1[i] == (char) runtimeMapArray[2][1]) && (grid_2_2[i] == (char) runtimeMapArray[2][2])) {
-                tmp = runtimeMapArray[y][x];
-                runtimeMapArray[y][x] = runtimeMapArray[nextY][nextX];
-                runtimeMapArray[nextY][nextX] = tmp;
-                return false;
-            }
-        }
-        x = nextX;
-        y = nextY;
-        grid_0_0[count] = (char) runtimeMapArray[0][0];
-        grid_0_1[count] = (char) runtimeMapArray[0][1];
-        grid_0_2[count] = (char) runtimeMapArray[0][2];
-        grid_1_0[count] = (char) runtimeMapArray[1][0];
-        grid_1_2[count] = (char) runtimeMapArray[1][2];
-        grid_2_0[count] = (char) runtimeMapArray[2][0];
-        grid_2_1[count] = (char) runtimeMapArray[2][1];
-        grid_2_2[count] = (char) runtimeMapArray[2][2];
-        count++;
+        if (isStatAlreadyExistent(nextX, nextY)) return false;
         return true;
     }
 
-    private void back() {
-        if (level <= 0)
+    private boolean hasSearchedAllDirectionsInCurrentLevel() {
+        return directions[searchingLevel] > COUNT_OF_ACTION;
+    }
+
+    private boolean searchLevelIsTooMuch() {
+        return searchingLevel > MAX_SEARCHING_LEVEL;
+    }
+
+    private boolean isMapIndexOutOfBoundary(int indexX, int indexY) {
+        if (indexX >= lengthOfSideOfGrids || indexX < 0)
+            return true;
+        if (indexY >= lengthOfSideOfGrids || indexY < 0)
+            return true;
+        return false;
+    }
+
+    private boolean isStatAlreadyExistent(int indexX, int indexY) {
+        char temp;
+        temp = runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X];
+        runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X] = runtimeMapArray[indexY][indexX];
+        runtimeMapArray[indexY][indexX] = temp;
+        for (int i = 0; i < searchingDirectionAmount; i++) {
+            if (isStatSame(i)) {
+                temp = runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X];
+                runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X] = runtimeMapArray[indexY][indexX];
+                runtimeMapArray[indexY][indexX] = temp;
+                return true;
+            }
+        }
+        runtimeIndexOfBlank_X = indexX;
+        runtimeIndexOfBlank_Y = indexY;
+        return false;
+    }
+
+    private boolean isStatSame(int index) {
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                if (statTable[index][i*lengthOfSideOfGrids + j] != runtimeMapArray[i][j])
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    private void saveMapStat() {
+        statTable[searchingDirectionAmount] = new char[NUMBER_OF_GRIDS];
+        for (int i = 0; i < lengthOfSideOfGrids; i++) {
+            for (int j = 0; j < lengthOfSideOfGrids; j++) {
+                statTable[searchingDirectionAmount][i*lengthOfSideOfGrids + j] = runtimeMapArray[i][j];
+            }
+        }
+        searchingDirectionAmount++;
+    }
+
+    private void goBackToTheLastLevel() {
+        if (searchingLevel <= 0)
         {
-            level--;
+            searchingLevel--;
             return;
         }
-        int backX = x - DX[act[level - 1] - 1];
-        int backY = y - DY[act[level - 1] - 1];
-        int tmp;
-        tmp = runtimeMapArray[y][x];
-        runtimeMapArray[y][x] = runtimeMapArray[backY][backX];
-        runtimeMapArray[backY][backX] = tmp;
-        x = backX;
-        y = backY;
-        act[level] = 0;
-        level--;
+        int backX = runtimeIndexOfBlank_X - DX[directions[searchingLevel - 1] - 1];
+        int backY = runtimeIndexOfBlank_Y - DY[directions[searchingLevel - 1] - 1];
+        char temp;
+        temp = runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X];
+        runtimeMapArray[runtimeIndexOfBlank_Y][runtimeIndexOfBlank_X] = runtimeMapArray[backY][backX];
+        runtimeMapArray[backY][backX] = temp;
+        runtimeIndexOfBlank_X = backX;
+        runtimeIndexOfBlank_Y = backY;
+        directions[searchingLevel] = 0;
+        searchingLevel--;
     }
 
-    public int[][] doSearch() {
-        System.out.println("Start searching");
-        grid_0_0[count] = (char) runtimeMapArray[0][0];
-        grid_0_1[count] = (char) runtimeMapArray[0][1];
-        grid_0_2[count] = (char) runtimeMapArray[0][2];
-        grid_1_0[count] = (char) runtimeMapArray[1][0];
-        grid_1_2[count] = (char) runtimeMapArray[1][2];
-        grid_2_0[count] = (char) runtimeMapArray[2][0];
-        grid_2_1[count] = (char) runtimeMapArray[2][1];
-        grid_2_2[count] = (char) runtimeMapArray[2][2];
-        count++;
-        while (!allComplete) {
-            level++;
-            levelComplete = false;
-            while (!levelComplete) {
-                act[level]++;
-                if (isActionOK()) {
-                    if (isSearchFinished()) {
-                        allComplete = true;
-                    }
-                    levelComplete = true;
-                }
-                else {
-                    if (act[level] > maxAct)
-                        back();
-                    if (level < 0) {
-                        levelComplete = true;
-                        allComplete = true;
-                        searchProcessListener.setSearchResult(false);
-                    }
-                }
-            }
-        }
-        System.out.println("Searching Over : " + (level+1));
-        System.out.println("hash table : " + count);
-        int nextX, nextY;
-        for (int i = 0; i <= level; i++) {
-            nextX = startX + DX[act[i] - 1];
-            nextY = startY + DY[act[i] - 1];
-            searchProcessListener.getPrimaryMap().exchange(startY, startX, nextY, nextX);
-            try {
-                Thread.sleep(500);
-            }catch(InterruptedException e) {
-                e.printStackTrace();
-            }
-            startX = nextX;
-            startY = nextY;
-        }
-        searchProcessListener.onSearchFinished();
-        return runtimeMapArray;
+    private boolean doNotHaveResult() {
+        return searchingLevel < 0;
     }
 
-    public int[][] getRuntimeMapArray() {
+    private SearchedPath getPath() {
+        SearchedPath path = new SearchedPath();
+        for (int i = 0; i <= searchingLevel; i++) {
+            path.addDirection(directions[i] - 1);
+        }
+        return path;
+    }
+
+    public char[][] getRuntimeMapArray() {
         return runtimeMapArray;
     }
 
